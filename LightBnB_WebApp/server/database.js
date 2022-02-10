@@ -95,12 +95,55 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  return pool
-  .query(`SELECT *
-  FROM properties LIMIT $1;`,
-  [limit])
+  const queryParams = [];
+
+  let queryString = `SELECT properties.*, AVG(property_reviews.rating) AS average_rating
+  FROM properties
+  JOIN property_reviews ON properties.id = property_id
+  `;
+
+  if(options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParams.length}`;
+  }
+
+  if(options.owner_id) {
+    queryParams.push(options.owner_id);
+    queryString += `${queryString.split(' ').includes('WHERE') ? `AND owner_id = $${queryParams.length}` : `WHERE owner_id = $${queryParams.length}`}`;
+  }
+
+  if(options.minimum_price_per_night && options.maximum_price_per_night) {
+    queryParams.push(options.minimum_price_per_night * 100);
+    queryParams.push(options.maximum_price_per_night * 100);
+    queryString += `${queryString.split(' ').includes('WHERE') ? `AND` : `WHERE`} cost_per_night BETWEEN $${queryParams.length -1} AND $${queryParams.length}`;
+  } else if (options.minimum_price_per_night) {
+    queryParams.push(options.minimum_price_per_night * 100);
+    queryString += `${queryString.split(' ').includes('WHERE') ? `AND` : `WHERE`} cost_per_night >= $${queryParams.length}`;
+  } else if (options.maximum_price_per_night) {
+    queryParams.push(options.maximum_price_per_night * 100);
+    queryString += `${queryString.split(' ').includes('WHERE') ? `AND` : `WHERE`} cost_per_night <= $${queryParams.length}`;
+  }
+  
+  queryString += `\nGROUP BY properties.id`;
+
+  if (options.minimum_rating) {
+    const condition = 'AVG(property_reviews.rating)';
+    queryParams.push(options.minimum_rating);
+    queryString += `\nHAVING ${condition} >= $${queryParams.length} `
+
+  }
+
+  queryParams.push(limit);
+  queryString += `
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length};
+  `;
+
+  console.log(queryString, queryParams);
+
+  return pool.query(queryString, queryParams)
   .then((result) => result.rows)
-  .catch((err) => console.log(err.message));
+    .catch((err) => console.log(err.message));
 };
 exports.getAllProperties = getAllProperties;
 
