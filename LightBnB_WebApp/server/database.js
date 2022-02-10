@@ -1,6 +1,7 @@
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
 const { Pool } = require('pg');
+const { CommandCompleteMessage } = require('pg-protocol/dist/messages');
 
 const pool = new Pool ({
   user: 'vagrant',
@@ -109,7 +110,7 @@ const getAllProperties = function(options, limit = 10) {
 
   if(options.owner_id) {
     queryParams.push(options.owner_id);
-    queryString += `${queryString.split(' ').includes('WHERE') ? `AND owner_id = $${queryParams.length}` : `WHERE owner_id = $${queryParams.length}`}`;
+    queryString += `WHERE owner_id = $${queryParams.length}`;
   }
 
   if(options.minimum_price_per_night && options.maximum_price_per_night) {
